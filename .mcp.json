@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "finna-libraries": {
+      "command": "node",
+      "args": ["src/server.js"]
+    }
+  }
+}

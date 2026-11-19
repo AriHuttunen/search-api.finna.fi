@@ -1,0 +1,21 @@
+{
+  "name": "finna-helsinki-libraries-mcp",
+  "version": "0.1.0",
+  "description": "MCP server for searching the Helsinki-area libraries (Helmet, Helka, 3AMK) through the open Finna API",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "finna-helsinki-libraries-mcp": "src/server.js"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node --test test/"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.32.2",
+    "zod": "^4.6.7"
+  }
+}
