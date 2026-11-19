@@ -1,6 +1,6 @@
 {
   "name": "finna-helsinki-libraries-mcp",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "MCP server for searching the Helsinki-area libraries (Helmet, Helka, 3AMK) through the open Finna API",
   "type": "module",
   "private": true,
