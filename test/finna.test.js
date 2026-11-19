@@ -2,8 +2,10 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-  FinnaError, buildSearchParams, buildingTree, formatRecord, formatSearch,
-  getRecords, libraryOfId, localIdsOf, normaliseLocation, recordUrl, search,
+  FinnaError, buildSearchParams, buildingTree, fetchAvailability,
+  formatAvailability, formatRecord, formatSearch, getRecords, libraryOfId,
+  localIdsOf, matchLocations, normaliseLanguage, normaliseLocation,
+  parseItemStatus, recordUrl, search,
 } from '../src/finna.js';
 
 const b = (value, translated) => ({ value, translated });
@@ -44,10 +46,11 @@ test('buildSearchParams: defaults search books in all three systems', () => {
   assert.ok(p.getAll('field[]').includes('dedupIds'));
 });
 
-test('buildSearchParams: locations replace libraries, filters are added', () => {
+test('buildSearchParams: locations narrow the search, filters are added', () => {
   const p = buildSearchParams({
-    query: 'x', libraries: ['helka'], locations: ['1/Helmet/v'], format: 'any',
-    language: 'SWE', yearFrom: 2010, sort: 'newest', searchIn: 'author',
+    query: 'x', libraries: ['helmet', 'helka'], locations: ['1/Helmet/v'],
+    format: 'any', language: 'SWE', yearFrom: 2010, sort: 'newest',
+    searchIn: 'author', facets: ['language'],
   });
   assert.deepEqual(p.getAll('filter[]'), [
     '~building:"1/Helmet/v/"', 'language:"swe"',
@@ -55,11 +58,62 @@ test('buildSearchParams: locations replace libraries, filters are added', () => 
   ]);
   assert.equal(p.get('sort'), 'main_date_str desc');
   assert.equal(p.get('type'), 'Author');
+  assert.deepEqual(p.getAll('facet[]'), ['language']);
 });
 
 test('buildSearchParams rejects bad input', () => {
   assert.throws(() => buildSearchParams({ language: 'fin"' }), FinnaError);
   assert.throws(() => buildSearchParams({ yearFrom: 2020, yearTo: 2010 }), FinnaError);
+  // A location outside the chosen library systems is a mistake, not a hint.
+  assert.throws(
+    () => buildSearchParams({ libraries: ['helka'], locations: ['1/Helmet/v/'] }),
+    /belongs to Helmet/,
+  );
+});
+
+test('normaliseLanguage accepts common two-letter and older codes', () => {
+  assert.equal(normaliseLanguage('fi'), 'fin');
+  assert.equal(normaliseLanguage('SV'), 'swe');
+  assert.equal(normaliseLanguage('ger'), 'deu');
+  assert.equal(normaliseLanguage('est'), 'est');
+  assert.throws(() => normaliseLanguage('xx'), /three-letter/);
+});
+
+const TREE = [
+  {
+    code: '1/Helmet/e/', name: 'Espoo', children: [
+      { code: '2/Helmet/e/e10/', name: 'Tapiola' },
+      { code: '2/Helmet/e/e10l/', name: 'Tapiola lapset' },
+    ],
+  },
+  {
+    code: '1/Helmet/h/', name: 'Helsinki', children: [
+      { code: '2/Helmet/h/h00/', name: 'Oodi' },
+      { code: '2/Helmet/h/h00l/', name: 'Oodi lapset' },
+      { code: '2/Helmet/h/h01/', name: 'Pasila' },
+      { code: '2/Helmet/h/h82/', name: 'Etelä-Haaga' },
+      { code: '2/Helmet/h/hva/', name: 'Kirjastoauto Helsinki' },
+    ],
+  },
+  { code: '1/3AMK/HHPAS/', name: 'Haaga-Helia Pasila', children: [] },
+  { code: '1/3AMK/HHHAA/', name: 'Haaga-Helia Haaga', children: [] },
+];
+
+test('matchLocations: a branch name covers its sections', () => {
+  assert.deepEqual(matchLocations('oodi', TREE).map((h) => h.code),
+    ['2/Helmet/h/h00/', '2/Helmet/h/h00l/']);
+});
+
+test('matchLocations: an exact city name does not pull in its branches', () => {
+  assert.deepEqual(matchLocations('Helsinki', TREE).map((h) => h.code), ['1/Helmet/h/']);
+});
+
+test('matchLocations: whole words only, across systems', () => {
+  assert.deepEqual(matchLocations('Pasila', TREE).map((h) => h.name),
+    ['Pasila', 'Haaga-Helia Pasila']);
+  // "Haaga" is a word of one campus name, not of "Haaga-Helia" or "Etelä-Haaga".
+  assert.deepEqual(matchLocations('Haaga', TREE).map((h) => h.name), ['Haaga-Helia Haaga']);
+  assert.deepEqual(matchLocations('Tapio', TREE), []);
 });
 
 test('localIdsOf keeps the Helsinki-area copies only', () => {
@@ -131,6 +185,24 @@ test('search replaces an outside representative with the local copies', async ()
   assert.doesNotMatch(out, /eepos/);
 });
 
+test('search names its scope, counts and refinements', async () => {
+  const fetchImpl = fakeFetch({
+    resultCount: 40, status: 'OK',
+    records: [{ id: 'helmet.5', title: 'Design', dedupIds: ['helmet.5'] }],
+    facets: {
+      language: [{ value: 'fin', count: 30 }, { value: 'eng', count: 10 }],
+      format: [{ value: '0/Book/', count: 35 }, { value: '0/Video/', count: 5 },
+        { value: '0/Other/', count: 1 }],
+    },
+  }, {});
+  const opts = { query: 'design', locations: ['2/Helmet/h/h00/'], format: 'any' };
+  const out = formatSearch(await search(opts, fetchImpl), { ...opts, availability: true });
+  assert.match(out, /40 titles for "design" in 2\/Helmet\/h\/h00\/ \(format: any\)/);
+  assert.match(out, /Narrow with language: fin 30, eng 10 · format: book 35, video 5\./);
+  assert.match(out, /check_availability/);
+  assert.doesNotMatch(formatSearch(await search(opts, fetchImpl), opts), /check_availability/);
+});
+
 test('API errors become FinnaError with the reason', async () => {
   const fetchImpl = async () => ({
     ok: false, status: 400,
@@ -172,6 +244,8 @@ test('getRecords finds the same title in the other systems', async () => {
     },
     calls,
   );
+  await assert.rejects(getRecords(['helmet.404'], fetchImpl), /No record with ID "helmet\.404"/);
+  calls.length = 0;
   const { records, siblings } = await getRecords(['helka.9', 'helmet.404'], fetchImpl);
   assert.equal(records.has('helmet.404'), false);
   assert.deepEqual(records.get('helka.9').dedupIds, ['3amk.2', 'helka.9', 'aalto.3']);
@@ -179,4 +253,113 @@ test('getRecords finds the same title in the other systems', async () => {
   // The group lookup asks only about the record that exists.
   assert.deepEqual(calls[1].searchParams.getAll('filter[]'),
     ['~local_ids_str_mv:"helka.9"']);
+});
+
+// Trimmed from a real answer of www.finna.fi/AJAX/JSON?method=getItemStatuses.
+const row = (state, name, shelf) => `
+    <div class="odd clearfix"><div class="no-branches">
+      <div class="groupLocation status-${state}">
+        <span class="icon icon--font fi" role="img" aria-hidden="true"></span>
+        <span class="location-name"><span class="branch">${name}</span></span>
+      </div>
+      <div class="groupCallnumber">${shelf}</div>
+    </div></div>`;
+const shelfMark = (mark) => `
+        <!-- START of: finna - Helpers/holding-callnumber.phtml -->
+        <div class="location-link-text"><span class="callnumber-text">
+          <span>Shelf: </span>${mark}    </span></div>`;
+const STATUS = {
+  id: 'helmet.1',
+  availability: 'available',
+  full_status: `<!-- START of: finna - ajax/status-full.phtml -->
+  <div class="header holdings available clearfix"><div>
+    <span class="available-total status-available">
+      <span class="icon" role="img"></span> <span>1&nbsp;available</span></span>
+    <span class="info"><span class="reservations">Reservations:&nbsp;2</span>
+      <span class="total">Items:&nbsp;3</span></span>
+  </div></div>
+  <div class="holdings truncate-field" data-rows="5">${
+    row('available', 'Tapiola aik', shelfMark('75.13 TUF'))}${
+    row('unavailable', 'Sello las', shelfMark('84.2 JAN &amp; co'))}${
+    row('unavailable', 'none', shelfMark('Tilattu 30.8.2025'))}
+  </div>
+  <div class="actions clearfix"><div class="title-hold">
+    <a href="/Record/helmet.1?login=true">Login to place a hold</a></div></div>
+  <script nonce="x">finna.layout.initTruncate($('.holding-details'));</script>`,
+};
+
+test('parseItemStatus reads counts, branches and shelf marks', () => {
+  assert.deepEqual(parseItemStatus(STATUS), {
+    id: 'helmet.1', known: true, available: 1, total: 3, reservations: 2,
+    locations: [
+      { name: 'Tapiola aik', available: true, shelf: '75.13 TUF' },
+      { name: 'Sello las', available: false, shelf: '84.2 JAN & co' },
+      { name: '', available: false, shelf: 'Tilattu 30.8.2025' },
+    ],
+  });
+});
+
+test('parseItemStatus: a record without holdings is unknown', () => {
+  const s = parseItemStatus({
+    id: 'helmet.404', availability: 'false', missing_data: true,
+    full_status: 'No Holdings Available',
+  });
+  assert.equal(s.known, false);
+  assert.deepEqual(s.locations, []);
+});
+
+test('fetchAvailability asks the website once and labels the records', async () => {
+  const calls = [];
+  const fetchImpl = async (url) => {
+    const u = new URL(url);
+    calls.push(u);
+    const body = u.host === 'www.finna.fi'
+      ? { data: { statuses: [STATUS] } }
+      : {
+        status: 'OK',
+        records: [{
+          id: 'helmet.1', title: 'Visual explanations', year: '1998',
+          buildings: [b('0/Helmet/', 'Helmet'), b('1/Helmet/e/', 'Espoo'),
+            b('2/Helmet/e/e10/', 'Tapiola'), b('2/Helmet/e/e01l/', 'Sello lapset')],
+        }],
+      };
+    return { ok: true, status: 200, json: async () => body };
+  };
+  const entries = await fetchAvailability(['helmet.1', 'helmet.404'], fetchImpl);
+  const web = calls.filter((u) => u.host === 'www.finna.fi');
+  assert.equal(web.length, 1);
+  assert.deepEqual(web[0].searchParams.getAll('id[]'), ['helmet.1', 'helmet.404']);
+
+  const out = formatAvailability(entries, new Date('2026-11-19T17:16:00Z'));
+  assert.match(out, /Visual explanations \(1998\) \[helmet\.1\] — Helmet\n1 of 3 copies available, 2 reservations\./);
+  assert.match(out, /Available at: Tapiola aik \(shelf 75\.13 TUF\)/);
+  assert.match(out, /Not available now at: Sello las; Tilattu 30\.8\.2025/);
+  assert.match(out, /\[helmet\.404\] — Helmet\nNo record with this ID\./);
+  assert.match(out, /read 19 Nov 2026, 19:16 Helsinki time/);
+  assert.doesNotMatch(out, /branch not named/);
+});
+
+test('formatAvailability marks rows that do not say which branch', () => {
+  const out = formatAvailability([{
+    id: 'helka.9', known: true, available: 2, total: 2, reservations: null,
+    locations: [
+      { name: 'Kaisa House, 28 days', available: true, shelf: 'Kielet Y Tufte' },
+      { name: '28 days', available: true, shelf: '004.12 Tufte' },
+    ],
+    record: {
+      id: 'helka.9', title: 'Visual explanations', year: '1997',
+      buildings: [b('0/HELKA/', 'Helka Libraries'), b('1/HELKA/KAISA/', 'Kaisa House'),
+        b('1/HELKA/KUMPULA/', 'Kumpula')],
+    },
+  }]);
+  assert.match(out, /Kaisa House, 28 days \(shelf Kielet Y Tufte\); 28 days \[branch not named\] \(shelf 004\.12 Tufte\)/);
+  assert.match(out, /The catalogue lists this record at: Kaisa House, Kumpula\./);
+});
+
+test('fetchAvailability reports a website that answers something else', async () => {
+  const fetchImpl = async (url) => ({
+    ok: new URL(url).host !== 'www.finna.fi', status: 403,
+    json: async () => ({ status: 'OK', records: [] }),
+  });
+  await assert.rejects(fetchAvailability(['helmet.1'], fetchImpl), /did not return shelf status/);
 });
