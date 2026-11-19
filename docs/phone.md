@@ -42,15 +42,19 @@ Steps 1 to 3 are repeated for every MCP server the phone chats should have.
    browser sign-in cannot be completed from the phone. `finna-libraries` needs
    none.
 
-4. **Serve one general-purpose folder with Remote Control**, for example
-   `~/chats`. With every server at user scope the folder no longer decides
-   which MCP servers a chat gets.
+4. **Start Remote Control in the folder the chats should run in.** This setup
+   uses `/Users/ari/github`, the folder that holds the repositories, so a chat
+   can also work on them.
 
    ```fish
-   mkdir -p ~/chats
-   cd ~/chats
+   cd /Users/ari/github
    claude remote-control
    ```
+
+   With every server at user scope the folder does not decide which MCP
+   servers a chat gets. It does decide two other things: Claude's memory notes
+   are kept per starting folder, and a repository's `CLAUDE.md` is read only
+   once the chat works on files inside that repository.
 
 5. **On the iPhone**, open the Claude app, go to Code and pick the Mac's
    session or start a new one there.
@@ -58,8 +62,9 @@ Steps 1 to 3 are repeated for every MCP server the phone chats should have.
 Keep the Mac awake (System Settings → Energy: prevent automatic sleeping) and
 Remote Control running; nothing works from the phone while either is off.
 
-Not tested when this was written: steps 4 and 5 as a fresh setup. Steps 1 and
-2 are standard Claude Code configuration.
+Steps 1 and 2 are standard Claude Code configuration. Step 4 describes the
+setup in use on 19 November 2026; the steps were not re-run from scratch to
+check them.
 
 ## After the server's code changes
 
