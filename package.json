@@ -4,6 +4,11 @@
   "description": "MCP server for searching the Helsinki-area libraries (Helmet, Helka, 3AMK) through the open Finna API",
   "type": "module",
   "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AriHuttunen/search-api.finna.fi.git"
+  },
   "bin": {
     "finna-helsinki-libraries-mcp": "src/server.js"
   },

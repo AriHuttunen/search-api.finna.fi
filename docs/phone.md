@@ -15,11 +15,11 @@ Steps 1 to 3 are repeated for every MCP server the phone chats should have.
    its path is relative. User scope makes the server available in every folder:
 
    ```fish
-   claude mcp add --scope user finna-libraries -- node /Users/ari/github/search-api.finna.fi/src/server.js
+   claude mcp add --scope user finna-libraries -- node /path/to/search-api.finna.fi/src/server.js
    claude mcp list
    ```
 
-   Adjust the path if the repository is somewhere else on that Mac. If the
+   Replace `/path/to` with where the repository is on that Mac. If the
    server does not start because `node` is not found, use its full path
    (`/opt/homebrew/bin/node`).
 
@@ -43,11 +43,11 @@ Steps 1 to 3 are repeated for every MCP server the phone chats should have.
    none.
 
 4. **Start Remote Control in the folder the chats should run in.** This setup
-   uses `/Users/ari/github`, the folder that holds the repositories, so a chat
+   uses `~/github`, the folder that holds the repositories, so a chat
    can also work on them.
 
    ```fish
-   cd /Users/ari/github
+   cd ~/github
    claude remote-control
    ```
 

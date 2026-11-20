@@ -168,7 +168,9 @@ What to know about this endpoint:
 - **It is slow.** The website asks each library's own system per record.
   Twenty records took 5.4 seconds, so the tool takes at most 10 per call.
 - **User-Agent matters.** curl's default User-Agent got 403; the server's own
-  got 200.
+  got 200. On 20 November 2026 the server's User-Agent with the repository
+  address appended in brackets, with or without `+https://`, also got 403,
+  so it is the project name and version only.
 
 Things the data does and does not say:
 
@@ -188,7 +190,7 @@ To run without the tool, so that the server only uses the open API, start it
 with `FINNA_AVAILABILITY=0`:
 
 ```fish
-claude mcp add --scope user --env FINNA_AVAILABILITY=0 finna-libraries -- node /Users/ari/github/search-api.finna.fi/src/server.js
+claude mcp add --scope user --env FINNA_AVAILABILITY=0 finna-libraries -- node /path/to/search-api.finna.fi/src/server.js
 ```
 
 ## Location list
