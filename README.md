@@ -69,15 +69,19 @@ The Helmet and Helka cards are free; how to get each of the three:
 Needs Node.js 20 or newer.
 
 ```fish
-cd /Users/ari/github/search-api.finna.fi
+git clone https://github.com/AriHuttunen/search-api.finna.fi.git
+cd search-api.finna.fi
 npm install
 npm test
 ```
 
+In the commands below, replace `/path/to/search-api.finna.fi` with the full
+path of the cloned directory.
+
 **Claude Code, in every folder:**
 
 ```fish
-claude mcp add --scope user finna-libraries -- node /Users/ari/github/search-api.finna.fi/src/server.js
+claude mcp add --scope user finna-libraries -- node /path/to/search-api.finna.fi/src/server.js
 ```
 
 **Claude Code, in this directory only:** `.mcp.json` already registers the
@@ -93,7 +97,7 @@ the app. If the app cannot find `node`, write its full path
   "mcpServers": {
     "finna-libraries": {
       "command": "node",
-      "args": ["/Users/ari/github/search-api.finna.fi/src/server.js"]
+      "args": ["/path/to/search-api.finna.fi/src/server.js"]
     }
   }
 }
@@ -124,6 +128,11 @@ After the server's code changes, start a new Claude session to load it.
   Claude Code Remote Control.
 - [docs/library-cards.md](docs/library-cards.md): getting a Helmet, Helka or
   3AMK card.
+
+## License
+
+The code is under the [MIT License](LICENSE). The catalogue data is not part
+of this repository; see below.
 
 ## Data
 

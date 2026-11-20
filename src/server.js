@@ -5,7 +5,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import {
-  FORMATS, FinnaError, SEARCH_TYPES, SORTS,
+  FORMATS, FinnaError, SEARCH_TYPES, SORTS, VERSION,
   fetchAvailability, formatAvailability, formatLocations, formatRecord,
   formatSearch, getRecords, listLocations, search,
 } from './finna.js';
@@ -16,7 +16,7 @@ import {
 const availability = !/^(0|false|no|off)$/i.test(process.env.FINNA_AVAILABILITY ?? '');
 
 const server = new McpServer(
-  { name: 'finna-helsinki-libraries', version: '0.2.0' },
+  { name: 'finna-helsinki-libraries', version: VERSION },
   {
     instructions:
       'Searches the catalogues of the three Helsinki-area library systems ' +

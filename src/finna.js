@@ -1,11 +1,20 @@
 // Finna API client and result formatting for the three Helsinki-area library
 // systems. No MCP code in here, so it can be tested and reused on its own.
 
+import { readFileSync } from 'node:fs';
+
+// The version is written once, in package.json.
+export const { version: VERSION } = JSON.parse(
+  readFileSync(new URL('../package.json', import.meta.url), 'utf8'),
+);
+
 export const API_BASE = 'https://api.finna.fi/v1';
 // Live shelf status is not in the API. The website's record pages load it from
 // this endpoint, which covers all three systems. See fetchAvailability.
 export const STATUS_URL = 'https://www.finna.fi/AJAX/JSON';
-const USER_AGENT = 'finna-helsinki-libraries-mcp/0.2';
+// Name and version only: www.finna.fi answered 403 when the repository address
+// was added in brackets (docs/technical.md).
+export const USER_AGENT = `finna-helsinki-libraries-mcp/${VERSION}`;
 const TIMEOUT_MS = 20_000;
 // /record accepts many id[] values per call; 60 was tested, 50 keeps URLs short.
 const RECORD_BATCH = 50;
